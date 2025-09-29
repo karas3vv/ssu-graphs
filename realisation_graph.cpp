@@ -7,181 +7,233 @@
 
 using namespace std;
 
-// ====== Структура узла ======
-struct Node {
-    string name; // имя вершины
+// структуры
 
-    // сравнение двух вершин (по имени)
+// структура вершины
+struct Node {
+    string name;
+
+    // сравнение вершин по имени
     bool operator==(const Node& other) const {
         return name == other.name;
     }
 };
 
-// ====== Структура ребра ====== 
+// структура ребра
 struct Edge {
-    Node* from;   // вершина-источник
-    Node* to;     // вершина-назначение
-    float weight; // вес (0, если граф невзвешенный)
-
-    Edge(Node* f, Node* t, float w) : from(f), to(t), weight(w) {}
+    Node* from;
+    Node* to;
+    float weight;
 };
 
-// ====== Хэш-функция для unordered_map ======
+// хэш-функция для Node (чтобы использовать в unordered_map)
 struct NodeHash {
     size_t operator()(const Node& n) const {
-        return hash<string>()(n.name); // считаем хэш по имени вершины
+        return hash<string>()(n.name);
     }
 };
 
-// ====== Класс Graph ====== 
+// класс Graph
 class Graph {
-private:
-    vector<Node> nodes; // список всех вершин
-    unordered_map<Node, vector<Edge>, NodeHash> adjacencyList; // список смежности
-    bool isOrient;   // true = ориентированный граф
-    bool isWeighted; // true = взвешенный граф
-
 public:
-    // конструктор
-    Graph(bool orient, bool weighted)
+    vector<Node> nodes;                                      // список вершин
+    unordered_map<Node, vector<Edge>, NodeHash> adjacencyList; // список смежности
+    bool isOrient;    // ориентированный
+    bool isWeighted;  // взвешенный
+
+    // конструктор по умолчанию
+    Graph(bool orient = false, bool weighted = false)
         : isOrient(orient), isWeighted(weighted) {}
 
-    // Создание графа из файла
-    static Graph fromFile(const string& path) {
-        ifstream file(path);
-        if (!file.is_open()) {
-            throw runtime_error("Не удалось открыть файл " + path);
-        }
-
-        // читаем тип графа
-        int orientFlag, weightedFlag;
-        file >> orientFlag >> weightedFlag;
-        Graph g(orientFlag, weightedFlag);
-
-        // читаем количество вершин
-        int N;
-        file >> N;
-
-        // читаем вершины
-        for (int i = 0; i < N; i++) {
-            string nodeName;
-            file >> nodeName;
-            g.addNode(Node{nodeName});
-        }
-
-        // читаем рёбра (пока не закончится файл)
-        string from, to;
-        float w = 0;
-        while (file >> from >> to) {
-            if (g.isWeighted) file >> w; // вес читаем только если граф взвешенный
-            Node* v = g.findNodePtr(from);
-            Node* u = g.findNodePtr(to);
-            if (v && u) g.addEdge(v, u, w);
-        }
-        return g;
-    }
-
-    // Создание графа через консоль
-    static Graph fromConsole() {
-        int orientFlag, weightedFlag;
-
-        cout << "Ориентированный? (1 - да, 0 - нет): ";
-        cin >> orientFlag;
-
-        cout << "Взвешенный? (1 - да, 0 - нет): ";
-        cin >> weightedFlag;
-
-        Graph g(orientFlag, weightedFlag);
-
-        // вводим вершины
-        int N;
-        cout << "Введите количество вершин: ";
-        cin >> N;
-
-        cout << "Введите имена вершин:\n";
-        for (int i = 0; i < N; i++) {
-            string name;
-            cin >> name;
-            g.addNode(Node{name});
-        }
-
-        // вводим рёбра
-        int M;
-        cout << "Введите количество рёбер: ";
-        cin >> M;
-
-        cout << "Введите рёбра (формат: from to [weight]):\n";
-        for (int i = 0; i < M; i++) {
-            string from, to;
-            float w = 0;
-            cin >> from >> to;
-            if (weightedFlag) cin >> w; // вес только если граф взвешенный
-            Node* v = g.findNodePtr(from);
-            Node* u = g.findNodePtr(to);
-            if (v && u) g.addEdge(v, u, w);
-        }
-        return g;
-    }
-
-    // Добавление вершины
-    void addNode(const Node& n) {
-        if (contains(n)) return;    // если вершина уже есть — не добавляем
-        nodes.push_back(n);         // добавляем в список
-        adjacencyList[n] = {};      // создаём пустой список смежности
-    }
-
-    // Поиск вершины по имени
+    // поиск вершины по имени
     Node* findNodePtr(const string& name) {
-        for (auto& node : nodes) {
-            if (node.name == name) return &node;
+        for (auto& n : nodes) {
+            if (n.name == name) return &n;
         }
         return nullptr;
     }
 
-    // Проверка наличия вершины
-    bool contains(const Node& n) const {
-        return find(nodes.begin(), nodes.end(), n) != nodes.end();
+    // добавление вершины
+    void addNode(const Node& n) {
+        if (findNodePtr(n.name)) {
+            cout << "Вершина " << n.name << " уже существует.\n";
+            return;
+        }
+        nodes.push_back(n);
+        adjacencyList[n] = {};
+        cout << "Вершина " << n.name << " добавлена.\n";
     }
 
-    // Добавление ребра
-    void addEdge(Node* v, Node* w, float weight = 0) {
-        float realWeight = isWeighted ? weight : 0;
-        adjacencyList[*v].push_back(Edge(v, w, realWeight)); // v → w
-        if (!isOrient) adjacencyList[*w].push_back(Edge(w, v, realWeight)); // если неориентированный → обратное ребро
+    // добавление ребра
+    void addEdge(Node* from, Node* to, float weight = 0) {
+        if (!from || !to) {
+            cout << "Ошибка: одна из вершин не найдена.\n";
+            return;
+        }
+
+        float w = isWeighted ? weight : 0;
+        adjacencyList[*from].push_back({from, to, w});
+
+        // если граф неориентированный — добавить обратное ребро
+        if (!isOrient) {
+            adjacencyList[*to].push_back({to, from, w});
+        }
+
+        cout << "Ребро " << from->name << " -> " << to->name
+             << " добавлено (вес " << w << ").\n";
     }
 
-    // Вывод графа
+    // удаление вершины
+    void deleteNode(const string& name) {
+        Node* n = findNodePtr(name);
+        if (!n) {
+            cout << "Вершина не найдена.\n";
+            return;
+        }
+
+        // удалить вершину из списка
+        nodes.erase(remove(nodes.begin(), nodes.end(), *n), nodes.end());
+
+        // удалить список смежности вершины
+        adjacencyList.erase(*n);
+
+        // удалить все рёбра, ведущие к этой вершине
+        for (auto& [node, edges] : adjacencyList) {
+            edges.erase(remove_if(edges.begin(), edges.end(),
+                [n](Edge& e) { return e.to == n; }), edges.end());
+        }
+
+        cout << "Вершина " << name << " удалена.\n";
+    }
+
+    // удаление ребра
+    void deleteEdge(const string& fromName, const string& toName) {
+        Node* fromNode = findNodePtr(fromName);
+        Node* toNode = findNodePtr(toName);
+
+        if (!fromNode || !toNode) {
+            cout << "Одна из вершин не найдена.\n";
+            return;
+        }
+
+        // удалить ребро from → to
+        auto& edgesFrom = adjacencyList[*fromNode];
+        edgesFrom.erase(remove_if(edgesFrom.begin(), edgesFrom.end(),
+            [toNode](Edge& e) { return e.to == toNode; }), edgesFrom.end());
+
+        // если граф неориентированный, удалить обратное ребро
+        if (!isOrient) {
+            auto& edgesTo = adjacencyList[*toNode];
+            edgesTo.erase(remove_if(edgesTo.begin(), edgesTo.end(),
+                [fromNode](Edge& e) { return e.to == fromNode; }), edgesTo.end());
+        }
+
+        cout << "Ребро " << fromName << " -> " << toName << " удалено.\n";
+    }
+
+    // вывод графа (список смежности)
     void printGraph() const {
-        for (const auto& node : nodes) {
+        cout << "\n===== Граф =====\n";
+        cout << "Ориентированный: " << (isOrient ? "да" : "нет") << "\n";
+        cout << "Взвешенный: " << (isWeighted ? "да" : "нет") << "\n";
+        cout << "Вершины: ";
+        for (auto& n : nodes) cout << n.name << " ";
+        cout << "\n\nСписок смежности:\n";
+        for (const auto& [node, edges] : adjacencyList) {
             cout << node.name << ": ";
-            auto it = adjacencyList.find(node);
-            if (it != adjacencyList.end()) {
-                for (const auto& edge : it->second) {
-                    cout << "(" << edge.to->name
-                         << ", w=" << edge.weight << ") ";
-                }
+            for (const auto& e : edges) {
+                cout << e.to->name;
+                if (isWeighted) cout << "(" << e.weight << ")";
+                cout << " ";
             }
             cout << "\n";
         }
+        cout << "================\n";
+    }
+
+    // создание графа через консоль
+    static Graph fromConsole() {
+        char orientChoice, weightChoice;
+        cout << "Ориентированный граф? (y/n): ";
+        cin >> orientChoice;
+        cout << "Взвешенный граф? (y/n): ";
+        cin >> weightChoice;
+
+        Graph g(orientChoice == 'y', weightChoice == 'y');
+
+        int n;
+        cout << "Введите количество вершин: ";
+        cin >> n;
+
+        for (int i = 0; i < n; i++) {
+            string name;
+            cout << "Имя вершины " << i + 1 << ": ";
+            cin >> name;
+            g.addNode({name});
+        }
+
+        int m;
+        cout << "Введите количество рёбер: ";
+        cin >> m;
+        cout << "Формат ребра: from to [weight]\n";
+
+        for (int i = 0; i < m; i++) {
+            string from, to;
+            float w = 0;
+            cin >> from >> to;
+            if (g.isWeighted) cin >> w;
+            g.addEdge(g.findNodePtr(from), g.findNodePtr(to), w);
+        }
+
+        return g;
+    }
+
+    // создание графа из файла
+    static Graph fromFile(const string& path) {
+        ifstream file(path);
+        if (!file.is_open()) throw runtime_error("Не удалось открыть файл");
+
+        char orientChoice, weightChoice;
+        file >> orientChoice >> weightChoice;
+
+        Graph g(orientChoice == 'y', weightChoice == 'y');
+
+        int n;
+        file >> n;
+        for (int i = 0; i < n; i++) {
+            string name;
+            file >> name;
+            g.addNode({name});
+        }
+
+        int m;
+        file >> m;
+        for (int i = 0; i < m; i++) {
+            string from, to;
+            float w = 0;
+            file >> from >> to;
+            if (g.isWeighted) file >> w;
+            g.addEdge(g.findNodePtr(from), g.findNodePtr(to), w);
+        }
+
+        return g;
     }
 };
 
 
 
 int main() {
+    setlocale(LC_ALL, "ru");
+
     try {
-        int choice;
-        cout << "Выберите способ создания графа:\n";
-        cout << "1 - из файла\n";
-        cout << "2 - ввод с консоли\n";
-        cin >> choice;
+        int createChoice;
+        cout << "Создать граф:\n1 - из файла\n2 - из консоли\n";
+        cin >> createChoice;
 
-        // создаём граф
-        Graph g = (choice == 1)
-                  ? Graph::fromFile("graph.txt")
-                  : Graph::fromConsole();
+        Graph g = (createChoice == 1)
+            ? Graph::fromFile("graph.txt")   // сам файл, в котором граф
+            : Graph::fromConsole();
 
-        // ======= здесь надо сделать какое-то интерактивное меню =======
         while (true) {
             cout << "\nМеню:\n";
             cout << "1 - Добавить вершину\n";
@@ -193,51 +245,50 @@ int main() {
             int action;
             cin >> action;
 
-            if (action == 0) break; // выход из цикла
+            if (action == 0) break;
 
             switch (action) {
-                case 1: { // добавить вершину
+                case 1: {
                     string name;
                     cout << "Имя вершины: ";
                     cin >> name;
-                    g.addNode(Node{name});
+                    g.addNode({name});
                     break;
                 }
-                case 2: { // добавить ребро
+                case 2: {
                     string from, to;
                     float weight = 0;
-                    cout << "Ребро (from to weight): ";
+                    cout << "Ребро (from to [weight]): ";
                     cin >> from >> to;
                     if (g.isWeighted) cin >> weight;
-                    Node* f = g.findNodePtr(from);
-                    Node* t = g.findNodePtr(to);
-                    if (f && t) g.addEdge(f, t, weight);
+                    g.addEdge(g.findNodePtr(from), g.findNodePtr(to), weight);
                     break;
                 }
-                case 3: { // удалить вершину
+                case 3: {
                     string name;
                     cout << "Имя вершины для удаления: ";
                     cin >> name;
-                    deleteNode(g, name);
+                    g.deleteNode(name);
                     break;
                 }
-                case 4: { // удалить ребро
+                case 4: {
                     string from, to;
                     cout << "Ребро для удаления (from to): ";
                     cin >> from >> to;
-                    deleteEdge(g, from, to);
+                    g.deleteEdge(from, to);
                     break;
                 }
-                case 5: // показать граф
+                case 5:
                     g.printGraph();
                     break;
                 default:
                     cout << "Некорректный выбор\n";
             }
         }
-        // ======= конец меню =======
+
     } catch (exception& e) {
-        cerr << e.what() << "\n";
+        cerr << "Ошибка: " << e.what() << "\n";
     }
+
     return 0;
 }

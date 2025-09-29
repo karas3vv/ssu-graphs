@@ -1,0 +1,7 @@
+undirected weighted
+A B 2
+B C 3
+C D 4
+E F 1
+F G 2
+H H 9
