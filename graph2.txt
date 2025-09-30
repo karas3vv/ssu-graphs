@@ -1,9 +1,13 @@
-directed weighted
-A B 3
-B C 2
-C D 4
-D B 1
-E F 5
-F E 5
-G G 7
-H A 6
+n n
+8
+A B C D E F G H
+9
+A B
+A C
+B D
+C E
+E F
+F G
+G H
+D G
+E E

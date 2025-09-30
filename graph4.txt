@@ -1,9 +1,12 @@
-directed unweighted
-A B
-B C
-C D
-D E
-E B
-C C
-F G
-I H
+n y
+7
+a b c d e f g
+8
+a b 1.5
+a c 2
+b d 3
+c d 2.5
+e f 4
+f g 1
+g e 3
+g g 0

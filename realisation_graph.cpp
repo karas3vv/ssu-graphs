@@ -231,7 +231,7 @@ int main() {
         cin >> createChoice;
 
         Graph g = (createChoice == 1)
-            ? Graph::fromFile("graph.txt")   // сам файл, в котором граф
+            ? Graph::fromFile("graph1.txt") // имя файла
             : Graph::fromConsole();
 
         while (true) {
