@@ -1,12 +1,8 @@
-y n
-7
-A B C D E F G
-8
 A B
-A C
-B D
+B C
+C A
 C D
-D E
 E F
 F G
 G G
+H H

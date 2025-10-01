@@ -1,13 +1,8 @@
-n n
-8
-A B C D E F G H
-9
-A B
-A C
-B D
-C E
-E F
-F G
-G H
-D G
-E E
+A B 4
+A C 7
+B D 3
+C D 6
+C E 2
+E E 9
+F G 5
+H H 8
