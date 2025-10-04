@@ -20,6 +20,8 @@ struct Point {
     Point(string adr = "") : adress(adr) {}
 };
 
+
+
 class Graph {
 private:
     bool directed;   
@@ -65,52 +67,107 @@ int Graph::findVertex(const string& name) const {
 
 // добавить вершину
 void Graph::addPoint(const string& name) {
-    if (findVertex(name) == -1) adjList.push_back(Point(name));
+    if (findVertex(name) != -1) {
+        cout << "Вершина \"" << name << "\" уже существует.\n";
+        return;
+    }
+    adjList.push_back(Point(name));
+    cout << "Вершина \"" << name << "\" успешно добавлена.\n";
 }
 
 // добавить ребро
 void Graph::addEdge(const string& from, const string& to, int weight) {
     int i = findVertex(from);
     int j = findVertex(to);
-    if (i == -1 || j == -1) throw runtime_error("Одна из вершин не найдена");
 
-    adjList[i].adj.push_back(Edge(to, weight));
+    // проверяем существование вершин
+    if (i == -1 && j == -1) {
+        cout << "Вершины \"" << from << "\" и \"" << to << "\" не существуют. Ребро добавить невозможно.\n";
+        return;
+    } else if (i == -1) {
+        cout << "Вершина \"" << from << "\" не существует. Ребро добавить невозможно.\n";
+        return;
+    } else if (j == -1) {
+        cout << "Вершина \"" << to << "\" не существует. Ребро добавить невозможно.\n";
+        return;
+    }
+
+    // проверяем, существует ли уже ребро
+    auto& edges = adjList[i].adj;
+    bool exists = any_of(edges.begin(), edges.end(), [&](const Edge& e) { return e.to == to; });
+
+    if (exists) {
+        cout << "Ребро \"" << from << " -> " << to << "\" уже существует. Добавление не выполнено.\n";
+        return;
+    }
+
+    // добавляем ребро
+    edges.push_back(Edge(to, weight));
 
     if (!directed && from != to) {
         adjList[j].adj.push_back(Edge(from, weight));
     }
+
+    cout << "Ребро \"" << from << " -> " << to << "\" добавлено.\n";
 }
+
 
 // удалить вершину
 void Graph::removePoint(const string& name) {
     int idx = findVertex(name);
-    if (idx == -1) return;
+    if (idx == -1) {
+        cout << "Вершина \"" << name << "\" не существует.\n";
+        return;
+    }
 
     adjList.erase(adjList.begin() + idx);
+
     // удаляем все рёбра, ведущие к этой вершине
     for (auto& v : adjList) {
         v.adj.erase(remove_if(v.adj.begin(), v.adj.end(),
                               [&](Edge& e) { return e.to == name; }),
                     v.adj.end());
     }
+
+    cout << "Вершина \"" << name << "\" удалена.\n";
 }
+
 
 // удалить ребро
 void Graph::removeEdge(const string& from, const string& to) {
     int i = findVertex(from);
-    if (i == -1) return;
-    adjList[i].adj.erase(remove_if(adjList[i].adj.begin(), adjList[i].adj.end(),
-                                   [&](Edge& e) { return e.to == to; }),
-                         adjList[i].adj.end());
+    int j = findVertex(to);
+
+    // проверяем существование вершин
+    if (i == -1 && j == -1) {
+        cout << "Вершины \"" << from << "\" и \"" << to << "\" не существуют. Ребро удалить невозможно.\n";
+        return;
+    } else if (i == -1) {
+        cout << "Вершина \"" << from << "\" не существует. Ребро удалить невозможно.\n";
+        return;
+    } else if (j == -1) {
+        cout << "Вершина \"" << to << "\" не существует. Ребро удалить невозможно.\n";
+        return;
+    }
+
+    auto& edgesFrom = adjList[i].adj;
+    auto it = remove_if(edgesFrom.begin(), edgesFrom.end(), [&](Edge& e) { return e.to == to; });
+
+    if (it == edgesFrom.end()) { // ребро не найдено
+        cout << "Ребро \"" << from << " -> " << to << "\" не существует.\n";
+    } else {
+        edgesFrom.erase(it, edgesFrom.end());
+        cout << "Ребро \"" << from << " -> " << to << "\" удалено.\n";
+    }
+
     if (!directed) {
-        int j = findVertex(to);
-        if (j != -1) {
-            adjList[j].adj.erase(remove_if(adjList[j].adj.begin(), adjList[j].adj.end(),
-                                           [&](Edge& e) { return e.to == from; }),
-                                 adjList[j].adj.end());
-        }
+        auto& edgesTo = adjList[j].adj;
+        edgesTo.erase(remove_if(edgesTo.begin(), edgesTo.end(), [&](Edge& e) { return e.to == from; }),
+                      edgesTo.end());
     }
 }
+
+
 
 void Graph::saveToFile(const string& filePath) const {
     ofstream fout(filePath);
@@ -144,101 +201,114 @@ void Graph::printAdjList(const string& filePath) const {
     }
 }
 
-
+struct GraphRecord {
+    string name;
+    Graph* g;
+};
 
 int main() {
+    vector<GraphRecord> graphs;
+    Graph* current = nullptr;
+    string currentName;
     int choice;
-    Graph* g = nullptr;  // указатель на текущий граф
 
     do {
         cout << "\n=== Меню ===\n";
-        cout << "1. Создать пустой граф\n";
-        cout << "2. Загрузить граф из файла (через конструктор)\n";
-        cout << "3. Добавить вершину\n";
-        cout << "4. Добавить ребро\n";
-        cout << "5. Удалить вершину\n";
-        cout << "6. Удалить ребро\n";
-        cout << "7. Показать список смежности\n";
-        cout << "8. Сохранить граф в файл для конструктора\n";
+        cout << "1. Создать новый пустой граф\n";
+        cout << "2. Загрузить граф из файла\n";
+        cout << "3. Переключиться на другой граф\n";
+        cout << "4. Добавить вершину\n";
+        cout << "5. Добавить ребро\n";
+        cout << "6. Показать список смежности текущего графа\n";
+        cout << "7. Сохранить текущий граф в файл\n";
+        cout << "8. Удалить вершину\n";
+        cout << "9. Удалить ребро\n";
         cout << "0. Выход\n";
         cout << "Введите ваш выбор: ";
         cin >> choice;
 
-        string from, to, fileName;
-        int weight;
+        string name, from, to, fileName;
         bool directed;
+        int weight;
 
         switch (choice) {
-            case 1:
-                cout << "Создать ориентированный граф? (1 = да, 0 = нет): ";
+            case 1: {
+                cout << "Введите имя нового графа: ";
+                cin >> name;
+                cout << "Ориентированный? (1 = да, 0 = нет): ";
                 cin >> directed;
-                delete g;  // удаляем старый граф, если был
-                g = new Graph(directed);
-                cout << "Пустой граф создан.\n";
+                Graph* g = new Graph(directed);
+                graphs.push_back({name, g});
+                current = g;
+                currentName = name;
+                cout << "Граф \"" << name << "\" создан и выбран как текущий.\n";
                 break;
+            }
 
-            case 2: // Загрузка графа из файла через конструктор
-                cout << "Введите имя файла: ";
+            case 2: {
+                cout << "Введите имя нового графа: ";
+                cin >> name;
+                cout << "Имя файла: ";
                 cin >> fileName;
-                cout << "Ориентированный граф? (1 = да, 0 = нет): ";
+                cout << "Ориентированный? (1 = да, 0 = нет): ";
                 cin >> directed;
-                delete g;  
-                try {
-                    g = new Graph(fileName, directed);
-                    cout << "Граф успешно загружен из файла.\n";
-                } catch (exception& e) {
-                    cerr << "Ошибка: " << e.what() << endl;
-                    g = nullptr;
+                Graph* g = new Graph(fileName, directed);
+                graphs.push_back({name, g});
+                current = g;
+                currentName = name;
+                cout << "Граф \"" << name << "\" загружен из " << fileName << " и выбран как текущий.\n";
+                break;
+            }
+
+            case 3: {  // переключение между графами
+                if (graphs.empty()) {
+                    cout << "Список графов пуст.\n";
+                    break;
+                }
+                cout << "Доступные графы:\n";
+                for (size_t i = 0; i < graphs.size(); i++) {
+                    cout << i << ". " << graphs[i].name << (graphs[i].g == current ? " (текущий)" : "") << "\n";
+                }
+                int index;
+                cout << "Введите номер графа для переключения: ";
+                cin >> index;
+                if (index >= 0 && index < (int)graphs.size()) {
+                    current = graphs[index].g;
+                    currentName = graphs[index].name;
+                    cout << "Переключились на граф \"" << currentName << "\".\n";
+                } else {
+                    cout << "Неверный индекс.\n";
                 }
                 break;
-
-            case 3:
-                if (!g) { cout << "Сначала создайте граф!\n"; break; }
-                cout << "Введите имя вершины: ";
-                cin >> from;
-                g->addPoint(from);
-                cout << "Вершина добавлена.\n";
-                break;
+            }
 
             case 4:
-                if (!g) { cout << "Сначала создайте граф!\n"; break; }
+                if (!current) { cout << "Нет активного графа.\n"; break; }
+                cout << "Введите имя вершины: ";
+                cin >> from;
+                current->addPoint(from);
+                break;
+
+            case 5:
+                if (!current) { cout << "Нет активного графа.\n"; break; }
                 cout << "Введите вершину-источник: ";
                 cin >> from;
                 cout << "Введите вершину-назначение: ";
                 cin >> to;
                 cout << "Введите вес ребра: ";
                 cin >> weight;
-                try {
-                    g->addEdge(from, to, weight);
-                    cout << "Ребро добавлено.\n";
-                } catch (exception& e) {
-                    cerr << "Ошибка: " << e.what() << endl;
-                }
-                break;
-
-            case 5:
-                if (!g) { cout << "Сначала создайте граф!\n"; break; }
-                cout << "Введите вершину, которую нужно удалить: ";
-                cin >> from;
-                g->removePoint(from);
-                cout << "Вершина удалена.\n";
+                current->addEdge(from, to, weight);
                 break;
 
             case 6:
-                if (!g) { cout << "Сначала создайте граф!\n"; break; }
-                cout << "Введите вершину-источник: ";
-                cin >> from;
-                cout << "Введите вершину-назначение: ";
-                cin >> to;
-                g->removeEdge(from, to);
-                cout << "Ребро удалено.\n";
-                break;
+                if (!current) { cout << "Нет активного графа.\n"; break; }
+                cout << "Список смежности графа \"" << currentName << "\":\n";
 
-            case 7:
-                if (!g) { cout << "Сначала создайте граф!\n"; break; }
-                g->printAdjList("out_readable.txt");
-                cout << "Список смежности сохранён в файл out_readable.txt и выведен на экран:\n";
-                for (const auto& v : g->adjList) {
+                // сохранить в файл
+                current->printAdjList("out_readable.txt");
+
+                // вывести на экран
+                for (const auto& v : current->adjList) {
                     cout << v.adress << ": ";
                     for (const auto& e : v.adj)
                         cout << "(" << e.to << "," << e.weight << ") ";
@@ -246,23 +316,44 @@ int main() {
                 }
                 break;
 
-            case 8:
-                if (!g) { cout << "Сначала создайте граф!\n"; break; }
-                g->saveToFile("out_for_constructor.txt");
-                cout << "Граф сохранён в формате для конструктора (out_for_constructor.txt).\n";
+
+            case 7:
+                if (!current) { cout << "Нет активного графа.\n"; break; }
+                current->saveToFile(currentName + "_export.txt");
+                cout << "Граф \"" << currentName << "\" сохранён в файл " 
+                     << currentName + "_export.txt" << "\n";
+                break;
+
+            case 8:  // удаление вершины
+                if (!current) { cout << "Нет активного графа.\n"; break; }
+                cout << "Введите вершину для удаления: ";
+                cin >> from;
+                current->removePoint(from);
+                break;
+
+            case 9:  // удаление ребра
+                if (!current) { cout << "Нет активного графа.\n"; break; }
+                cout << "Введите вершину-источник: ";
+                cin >> from;
+                cout << "Введите вершину-назначение: ";
+                cin >> to;
+                current->removeEdge(from, to);
                 break;
 
             case 0:
-                cout << "Выход из программы.\n";
+                cout << "Выход...\n";
                 break;
 
             default:
-                cout << "Неверный выбор. Попробуйте снова.\n";
+                cout << "Неверный выбор.\n";
         }
 
     } while (choice != 0);
 
-    delete g;
+    // очистка памяти
+    for (auto& rec : graphs) {
+        delete rec.g;
+    }
 
     return 0;
 }
