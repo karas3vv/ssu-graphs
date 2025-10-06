@@ -40,6 +40,8 @@ public:
     void printAdjList(const string& filePath) const;
     void saveToFile(const string& filePath) const;
     int findVertex(const string& name) const;
+
+    void findCommonTarget(const string& u, const string& v) const;
 };
 
 // реализация
@@ -167,8 +169,46 @@ void Graph::removeEdge(const string& from, const string& to) {
     }
 }
 
+// найти общую вершину назначения для двух вершин-источников
+void Graph::findCommonTarget(const string& u, const string& v) const {
+    int idxU = findVertex(u);
+    int idxV = findVertex(v);
 
+    if (idxU == -1 && idxV == -1) {
+        cout << "Вершины \"" << u << "\" и \"" << v << "\" не существуют.\n";
+        return;
+    } else if (idxU == -1) {
+        cout << "Вершина \"" << u << "\" не существует.\n";
+        return;
+    } else if (idxV == -1) {
+        cout << "Вершина \"" << v << "\" не существует.\n";
+        return;
+    }
 
+    const auto& edgesU = adjList[idxU].adj;
+    const auto& edgesV = adjList[idxV].adj;
+
+    vector<string> common;
+    for (const auto& e1 : edgesU) {
+        for (const auto& e2 : edgesV) {
+            if (e1.to == e2.to) {
+                common.push_back(e1.to);
+            }
+        }
+    }
+
+    if (common.empty()) {
+        cout << "Нет вершин, в которые идут дуги и из \"" << u << "\", и из \"" << v << "\".\n";
+    } else {
+        cout << "Вершины, в которые идут дуги из \"" << u << "\" и \"" << v << "\": ";
+        for (const auto& name : common) {
+            cout << name << " ";
+        }
+        cout << "\n";
+    }
+}
+
+// сохранить граф в файл
 void Graph::saveToFile(const string& filePath) const {
     ofstream fout(filePath);
     if (!fout.is_open()) throw runtime_error("Не удалось открыть файл");
@@ -204,6 +244,8 @@ void Graph::printAdjList(const string& filePath) const {
 struct GraphRecord {
     string name;
     Graph* g;
+
+
 };
 
 int main() {
@@ -223,6 +265,7 @@ int main() {
         cout << "7. Сохранить текущий граф в файл\n";
         cout << "8. Удалить вершину\n";
         cout << "9. Удалить ребро\n";
+        cout << "10. Найти вершину, в которую ведут дуги из u и v\n";
         cout << "0. Выход\n";
         cout << "Введите ваш выбор: ";
         cin >> choice;
@@ -339,7 +382,17 @@ int main() {
                 cin >> to;
                 current->removeEdge(from, to);
                 break;
-
+            
+            case 10: {
+                if (!current) { cout << "Нет активного графа.\n"; break; }
+                string u, v;
+                cout << "Введите имя вершины u: ";
+                cin >> u;
+                cout << "Введите имя вершины v: ";
+                cin >> v;
+                current->findCommonTarget(u, v);
+                break;
+            }
             case 0:
                 cout << "Выход...\n";
                 break;
