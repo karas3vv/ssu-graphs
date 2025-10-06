@@ -42,6 +42,7 @@ public:
     int findVertex(const string& name) const;
 
     void findCommonTarget(const string& u, const string& v) const;
+    void printDegrees() const;
 };
 
 // реализация
@@ -241,11 +242,40 @@ void Graph::printAdjList(const string& filePath) const {
     }
 }
 
+// вывести степени вершин
+void Graph::printDegrees() const {
+    cout << "\nСтепени вершин:\n";
+
+    for (const auto& v : adjList) {
+        int outDeg = v.adj.size(); // исходящая степень
+        int inDeg = 0;             // входящая степень
+
+        // считаем входящие рёбра
+        for (const auto& u : adjList) {
+            for (const auto& e : u.adj) {
+                if (e.to == v.adress) {
+                    inDeg++;
+                }
+            }
+        }
+
+        if (directed) {
+            cout << v.adress << ": входящая = " << inDeg 
+                 << ", исходящая = " << outDeg << "\n";
+        } else {
+            // неориентированный граф: петля добавляет ещё 1
+            int degree = outDeg;
+            for (const auto& e : v.adj) {
+                if (e.to == v.adress) degree++;
+            }
+            cout << v.adress << ": степень = " << degree << "\n";
+        }
+    }
+}
+
 struct GraphRecord {
     string name;
     Graph* g;
-
-
 };
 
 int main() {
@@ -266,6 +296,7 @@ int main() {
         cout << "8. Удалить вершину\n";
         cout << "9. Удалить ребро\n";
         cout << "10. Найти вершину, в которую ведут дуги из u и v\n";
+        cout << "11. Вывести степени всех вершин\n";
         cout << "0. Выход\n";
         cout << "Введите ваш выбор: ";
         cin >> choice;
@@ -393,6 +424,15 @@ int main() {
                 current->findCommonTarget(u, v);
                 break;
             }
+
+            case 11:
+                if (!current) { 
+                    cout << "Нет активного графа.\n"; 
+                    break; 
+                }
+                current->printDegrees();
+                break;
+            
             case 0:
                 cout << "Выход...\n";
                 break;
