@@ -43,6 +43,9 @@ public:
 
     void findCommonTarget(const string& u, const string& v) const;
     void printDegrees() const;
+
+    Graph getReversed() const;
+
 };
 
 // реализация
@@ -273,6 +276,29 @@ void Graph::printDegrees() const {
     }
 }
 
+Graph Graph::getReversed() const {
+    if (!directed) {
+        throw runtime_error("Операция обращённого графа применима только к ориентированным графам!");
+    }
+
+    Graph reversed(true); // создаём новый ориентированный граф
+
+    // добавляем все вершины
+    for (const auto& v : adjList) {
+        reversed.addPoint(v.adress);
+    }
+
+    // добавляем рёбра в обратном направлении
+    for (const auto& v : adjList) {
+        for (const auto& e : v.adj) {
+            reversed.addEdge(e.to, v.adress, e.weight);
+        }
+    }
+
+    return reversed;
+}
+
+
 struct GraphRecord {
     string name;
     Graph* g;
@@ -297,6 +323,7 @@ int main() {
         cout << "9. Удалить ребро\n";
         cout << "10. Найти вершину, в которую ведут дуги из u и v\n";
         cout << "11. Вывести степени всех вершин\n";
+        cout << "12. Построить обращённый орграф\n";
         cout << "0. Выход\n";
         cout << "Введите ваш выбор: ";
         cin >> choice;
@@ -433,6 +460,34 @@ int main() {
                 current->printDegrees();
                 break;
             
+            case 12: {
+                if (!current) { 
+                    cout << "Нет активного графа.\n"; 
+                    break; 
+                }
+                try {
+                    Graph reversed = current->getReversed();
+
+                    // показываем пользователю
+                    cout << "Обращённый граф создан. Его список смежности:\n";
+                    for (const auto& v : reversed.adjList) {
+                        cout << v.adress << ": ";
+                        for (const auto& e : v.adj)
+                            cout << "(" << e.to << "," << e.weight << ") ";
+                        cout << "\n";
+                    }
+
+                    // при желании можно сохранить
+                    reversed.saveToFile(currentName + "_reversed.txt");
+                    cout << "Обращённый граф сохранён в файл: " 
+                        << currentName + "_reversed.txt" << "\n";
+                } 
+                catch (const exception& e) {
+                    cout << "Ошибка: " << e.what() << "\n";
+                }
+                break;
+            }
+
             case 0:
                 cout << "Выход...\n";
                 break;
