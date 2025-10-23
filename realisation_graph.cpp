@@ -45,6 +45,8 @@ public:
 
     Graph getReversed() const;
 
+    void kruskalMST() const;
+
     // вспомогательные: подсчёт числа вершин и рёбер 
     // (для неориентированного учитываем каждое неориентир. ребро 1 раз)
     int vertexCount() const {
@@ -513,10 +515,96 @@ Graph Graph::getReversed() const {
     return reversed;
 }
 
+void Graph::kruskalMST() const {
+    // Алгоритм Краскала работает только для неориентированных графов
+    if (directed) {
+        cout << "Kruskal: граф ориентированный — алгоритм применим только к неориентированным графам.\n";
+        return;
+    }
+
+    // вспомогательная запись ребра: индексы вершин + вес
+    struct ERec { int u, v, w; };
+
+    int n = (int)adjList.size();
+    if (n == 0) {
+        cout << "Граф пустой.\n";
+        return;
+    }
+
+    // 1) Собираем все рёбра (для неориентированного — только один раз: i < j)
+    vector<ERec> edges;
+    for (int i = 0; i < n; ++i) {
+        for (const auto& e : adjList[i].adj) {
+            int j = findVertex(e.to);
+            if (j == -1) continue; // защита на случай неконсистентности
+            if (i < j) { // добавляем только один экземпляр ребра для неориентированного графа
+                edges.push_back({i, j, e.weight});
+            }
+        }
+    }
+
+    if (edges.empty()) {
+        cout << "В графе нет рёбер.\n";
+        return;
+    }
+
+    // 2) Сортируем рёбра по весу
+    sort(edges.begin(), edges.end(), [](const ERec& a, const ERec& b) {
+        return a.w < b.w;
+    });
+
+    // 3) DSU (Union-Find) по индексам 0..n-1
+    struct DSU {
+        vector<int> p, r;
+        DSU(int n=0) { p.resize(n); r.assign(n,0); for (int i=0;i<n;++i) p[i]=i; }
+        int find(int a) { return p[a]==a ? a : p[a]=find(p[a]); }
+        bool unite(int a, int b) {
+            a = find(a); b = find(b);
+            if (a==b) return false;
+            if (r[a] < r[b]) swap(a,b);
+            p[b] = a;
+            if (r[a]==r[b]) ++r[a];
+            return true;
+        }
+    } dsu(n);
+
+    // 4) Построим MST в новом графе mst
+    Graph mst(false); // неориентированный
+    for (const auto& pt : adjList) mst.addPoint(pt.adress); // добавим все вершины в MST
+
+    int totalWeight = 0;
+    vector<ERec> mstEdges;
+
+    cout << "\n--- Алгоритм Краскала ---\n";
+    for (const auto& er : edges) {
+        if (dsu.find(er.u) != dsu.find(er.v)) {
+            dsu.unite(er.u, er.v);
+            mst.addEdge(adjList[er.u].adress, adjList[er.v].adress, er.w);
+            mstEdges.push_back(er);
+            totalWeight += er.w;
+            cout << "Добавлено ребро: " << adjList[er.u].adress 
+                 << " - " << adjList[er.v].adress 
+                 << " (вес = " << er.w << ")\n";
+        }
+    }
+
+    cout << "Суммарный вес минимального остова: " << totalWeight << "\n";
+
+    // Сохраним результат в файл
+    try {
+        mst.saveToFile("mst_output.txt");
+        cout << "MST сохранён в mst_output.txt\n";
+    } catch (const exception& ex) {
+        cout << "Не удалось сохранить MST в файл: " << ex.what() << "\n";
+    }
+}
+
 struct GraphRecord {
     string name;
     Graph* g;
 };
+
+
 
 int main() {
     vector<GraphRecord> graphs;
@@ -540,6 +628,7 @@ int main() {
         cout << "12. Построить обращённый орграф\n";
         cout << "13. Классифицировать текущий граф\n";
         cout << "14. Найти вершины, до всех остальных достижимые за ≤ k шагов\n";
+        cout << "15. Построить минимальный остров (Краскал)\n";
         cout << "0. Выход\n";
         cout << "Введите ваш выбор: ";
         cin >> choice;
@@ -726,6 +815,11 @@ int main() {
                 cout << "\n";
                 break;
             }
+
+            case 15:
+                if (!current) { cout << "Нет активного графа.\n"; break; }
+                current->kruskalMST();
+                break;
 
             case 0:
                 cout << "Выход...\n";
