@@ -5,6 +5,9 @@
 #include <fstream>
 #include <stdexcept>
 #include <queue>
+#include <unordered_map>
+#include <set>
+#include <climits>
 
 using namespace std;
 
@@ -46,6 +49,11 @@ public:
     Graph getReversed() const;
 
     void kruskalMST() const;
+
+    vector<string> verticesAllDistances(int N) const;
+    void bellmanFord(const string& start) const;
+    void floydPeriphery(const string& start, int N) const;
+
 
     // вспомогательные: подсчёт числа вершин и рёбер 
     // (для неориентированного учитываем каждое неориентир. ребро 1 раз)
@@ -599,6 +607,168 @@ void Graph::kruskalMST() const {
     }
 }
 
+vector<string> Graph::verticesAllDistances(int N) const {
+    vector<string> result;
+    int n = vertexCount();
+    if (n == 0) return result;
+
+    const long long INF = LLONG_MAX;
+
+    // Для каждой вершины запускаем Дейкстру (на основе индексов)
+    for (int s = 0; s < n; ++s) {
+        vector<long long> dist(n, INF);
+        dist[s] = 0;
+
+        // min-структура: set (ключ = (dist, vertex_index))
+        set<pair<long long,int>> pq;
+        pq.insert({0, s});
+
+        while (!pq.empty()) {
+            auto it = pq.begin();
+            long long d = it->first;
+            int v = it->second;
+            pq.erase(it);
+
+            if (d > dist[v]) continue;
+
+            // перебираем исходящие рёбра из v
+            for (const auto& e : adjList[v].adj) {
+                int to = findVertex(e.to);
+                if (to == -1) continue; // защита на случай неконсистентности
+                long long nd = d + (long long)e.weight;
+                if (nd < dist[to]) {
+                    // если в множестве уже было старое значение — удаляем его
+                    if (dist[to] != INF) {
+                        auto old = make_pair(dist[to], to);
+                        auto oit = pq.find(old);
+                        if (oit != pq.end()) pq.erase(oit);
+                    }
+                    dist[to] = nd;
+                    pq.insert({nd, to});
+                }
+            }
+        } // конец Дейкстры для s
+
+        // Проверяем: все вершины достижимы и dist <= N
+        bool ok = true;
+        for (int j = 0; j < n; ++j) {
+            if (j == s) continue;
+            if (dist[j] == INF || dist[j] > N) { ok = false; break; }
+        }
+        if (ok) result.push_back(adjList[s].adress);
+    }
+
+    return result;
+}
+
+void Graph::bellmanFord(const string& start) const {
+    int n = vertexCount();
+    int startIndex = findVertex(start);
+
+    if (startIndex == -1) {
+        cout << "Вершина " << start << " не найдена.\n";
+        return;
+    }
+
+    const long long INF = LLONG_MAX / 4;
+    vector<long long> dist(n, INF);
+    dist[startIndex] = 0;
+
+    // Алгоритм Беллмана–Форда
+    for (int i = 0; i < n - 1; ++i) {
+        bool updated = false;
+        for (int u = 0; u < n; ++u) {
+            if (dist[u] == INF) continue;
+            for (const auto& e : adjList[u].adj) {
+                int v = findVertex(e.to);
+                if (v == -1) continue;
+                long long w = e.weight;
+                if (dist[u] + w < dist[v]) {
+                    dist[v] = dist[u] + w;
+                    updated = true;
+                }
+            }
+        }
+        if (!updated) break;
+    }
+
+    // Проверка на отрицательные циклы
+    for (int u = 0; u < n; ++u) {
+        if (dist[u] == INF) continue;
+        for (const auto& e : adjList[u].adj) {
+            int v = findVertex(e.to);
+            if (v == -1) continue;
+            if (dist[u] + e.weight < dist[v]) {
+                cout << "Граф содержит цикл отрицательного веса!\n";
+                return;
+            }
+        }
+    }
+
+    // Вывод результатов
+    cout << "Кратчайшие расстояния от вершины " << start << ":\n";
+    for (int i = 0; i < n; ++i) {
+        cout << adjList[i].adress << " : ";
+        if (dist[i] == INF)
+            cout << "недостижима\n";
+        else
+            cout << dist[i] << "\n";
+    }
+}
+
+void Graph::floydPeriphery(const string& start, int N) const {
+    int n = adjList.size();
+    if (n == 0) {
+        cout << "Граф пуст.\n";
+        return;
+    }
+
+    // Сопоставляем вершины индексам
+    unordered_map<string, int> idx;
+    for (int i = 0; i < n; ++i)
+        idx[adjList[i].adress] = i;
+
+    if (!idx.count(start)) {
+        cout << "Вершина " << start << " не найдена в графе.\n";
+        return;
+    }
+
+    // Инициализация матрицы расстояний
+    vector<vector<int>> dist(n, vector<int>(n, INT_MAX / 2));
+
+    for (int i = 0; i < n; ++i)
+        dist[i][i] = 0;
+
+    for (int i = 0; i < n; ++i)
+        for (const auto& e : adjList[i].adj)
+            dist[i][idx[e.to]] = min(dist[i][idx[e.to]], e.weight);
+
+    // Алгоритм Флойда–Уоршелла
+    for (int k = 0; k < n; ++k)
+        for (int i = 0; i < n; ++i)
+            for (int j = 0; j < n; ++j)
+                if (dist[i][j] > dist[i][k] + dist[k][j])
+                    dist[i][j] = dist[i][k] + dist[k][j];
+
+    // Определяем N-периферию
+    int s = idx[start];
+    vector<string> periphery;
+    for (int i = 0; i < n; ++i)
+        if (dist[s][i] > N && dist[s][i] < INT_MAX / 2)
+            periphery.push_back(adjList[i].adress);
+
+    // Вывод результата
+    cout << "N-периферия вершины " << start << " (N = " << N << "): ";
+    if (periphery.empty())
+        cout << "пусто\n";
+    else {
+        for (const auto& v : periphery)
+            cout << v << " ";
+        cout << "\n";
+    }
+}
+
+
 struct GraphRecord {
     string name;
     Graph* g;
@@ -629,6 +799,9 @@ int main() {
         cout << "13. Классифицировать текущий граф\n";
         cout << "14. Найти вершины, до всех остальных достижимые за ≤ k шагов\n";
         cout << "15. Построить минимальный остров (Краскал)\n";
+        cout << "16. Найти вершины, из которых все минимальные пути до остальных ≤ N (Дейкстра)\n";
+        cout << "17. Найти кратчайшие пути из заданной вершины (Беллман–Форд)\n";
+        cout << "18. Определить N-периферию для заданной вершины (Флойд–Уоршелл)\n";
         cout << "0. Выход\n";
         cout << "Введите ваш выбор: ";
         cin >> choice;
@@ -722,7 +895,6 @@ int main() {
                 }
                 break;
 
-
             case 7:
                 if (!current) { cout << "Нет активного графа.\n"; break; }
                 current->saveToFile(currentName + "_export.txt");
@@ -772,8 +944,6 @@ int main() {
                 }
                 try {
                     Graph reversed = current->getReversed();
-
-                    // показываем пользователю
                     cout << "Обращённый граф создан. Его список смежности:\n";
                     for (const auto& v : reversed.adjList) {
                         cout << v.adress << ": ";
@@ -781,8 +951,6 @@ int main() {
                             cout << "(" << e.to << "," << e.weight << ") ";
                         cout << "\n";
                     }
-
-                    // при желании можно сохранить
                     reversed.saveToFile(currentName + "_reversed.txt");
                     cout << "Обращённый граф сохранён в файл: " 
                         << currentName + "_reversed.txt" << "\n";
@@ -820,6 +988,46 @@ int main() {
                 if (!current) { cout << "Нет активного графа.\n"; break; }
                 current->kruskalMST();
                 break;
+            
+            case 16: {
+                if (!current) { cout << "Нет активного графа.\n"; break; }
+                int N;
+                cout << "Введите N: ";
+                cin >> N;
+                auto res = current->verticesAllDistances(N);
+                if (res.empty()) {
+                    cout << "Нет таких вершин (никакая вершина не удовлетворяет условию).\n";
+                } else {
+                    cout << "Подходящие вершины: ";
+                    for (const auto &name : res) cout << name << " ";
+                    cout << "\n";
+                }
+                break;
+            }  
+
+            case 17: {
+                if (!current) { cout << "Нет активного графа.\n"; break; }
+                string start;
+                cout << "Введите имя начальной вершины: ";
+                cin >> start;
+                current->bellmanFord(start);
+                break;
+            }
+
+            case 18: {
+                if (!current) {
+                    cout << "Нет активного графа.\n";
+                    break;
+                }
+                string start;
+                int N;
+                cout << "Введите вершину: ";
+                cin >> start;
+                cout << "Введите N: ";
+                cin >> N;
+                current->floydPeriphery(start, N);
+                break;
+            }
 
             case 0:
                 cout << "Выход...\n";
