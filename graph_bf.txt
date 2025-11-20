@@ -5,3 +5,4 @@ B D 2
 C D 3
 C E 2
 D E -3
+E A -1

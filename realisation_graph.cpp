@@ -50,10 +50,11 @@ public:
 
     void kruskalMST() const;
 
-    vector<string> verticesAllDistances(int N) const;
-    void bellmanFord(const string& start) const;
+    void verticesAllDistances() const;
+    void bellmanFord(const string& start);
     void floydPeriphery(const string& start, int N) const;
 
+    int edmondsKarp(const string& sourceName, const string& sinkName) const;
 
     // вспомогательные: подсчёт числа вершин и рёбер 
     // (для неориентированного учитываем каждое неориентир. ребро 1 раз)
@@ -607,61 +608,77 @@ void Graph::kruskalMST() const {
     }
 }
 
-vector<string> Graph::verticesAllDistances(int N) const {
-    vector<string> result;
-    int n = vertexCount();
-    if (n == 0) return result;
-
-    const long long INF = LLONG_MAX;
-
-    // Для каждой вершины запускаем Дейкстру (на основе индексов)
-    for (int s = 0; s < n; ++s) {
-        vector<long long> dist(n, INF);
-        dist[s] = 0;
-
-        // min-структура: set (ключ = (dist, vertex_index))
-        set<pair<long long,int>> pq;
-        pq.insert({0, s});
-
-        while (!pq.empty()) {
-            auto it = pq.begin();
-            long long d = it->first;
-            int v = it->second;
-            pq.erase(it);
-
-            if (d > dist[v]) continue;
-
-            // перебираем исходящие рёбра из v
-            for (const auto& e : adjList[v].adj) {
-                int to = findVertex(e.to);
-                if (to == -1) continue; // защита на случай неконсистентности
-                long long nd = d + (long long)e.weight;
-                if (nd < dist[to]) {
-                    // если в множестве уже было старое значение — удаляем его
-                    if (dist[to] != INF) {
-                        auto old = make_pair(dist[to], to);
-                        auto oit = pq.find(old);
-                        if (oit != pq.end()) pq.erase(oit);
-                    }
-                    dist[to] = nd;
-                    pq.insert({nd, to});
-                }
-            }
-        } // конец Дейкстры для s
-
-        // Проверяем: все вершины достижимы и dist <= N
-        bool ok = true;
-        for (int j = 0; j < n; ++j) {
-            if (j == s) continue;
-            if (dist[j] == INF || dist[j] > N) { ok = false; break; }
-        }
-        if (ok) result.push_back(adjList[s].adress);
+void Graph::verticesAllDistances() const {
+    if (adjList.empty()) {
+        cout << "Граф пуст.\n";
+        return;
     }
 
-    return result;
+    string startName;
+    cout << "Введите начальную вершину: ";
+    cin >> startName;
+
+    int s = findVertex(startName);
+    if (s == -1) {
+        cout << "Вершина \"" << startName << "\" не найдена.\n";
+        return;
+    }
+
+    const int INF = INT_MAX / 4;
+    int n = vertexCount();
+    vector<int> dist(n, INF);
+    vector<int> parent(n, -1); // опционально: чтобы восстановить пути
+    dist[s] = 0;
+
+    // min-куча: (dist, vertex_index)
+    priority_queue<pair<int,int>, vector<pair<int,int>>, greater<pair<int,int>>> pq;
+    pq.push({0, s});
+
+    while (!pq.empty()) {
+        auto [d, v] = pq.top(); pq.pop();
+        if (d != dist[v]) continue; // устаревшая запись в куче
+
+        // проходим все вершины-соседи v (используем adjList)
+        for (const auto& e : adjList[v].adj) {
+            int to = findVertex(e.to);
+            if (to == -1) continue; // защита от неконсистентности
+            int w = e.weight;
+            if (dist[v] != INF && dist[v] + w < dist[to]) {
+                dist[to] = dist[v] + w;
+                parent[to] = v;
+                pq.push({dist[to], to});
+            }
+        }
+    }
+
+    // вывод расстояний
+    cout << "\nКратчайшие расстояния от вершины " << startName << ":\n";
+    for (int i = 0; i < n; ++i) {
+        cout << adjList[i].adress << " : ";
+        if (dist[i] == INF) cout << "недостижима\n";
+        else cout << dist[i] << "\n";
+    }
+
+    // если тебе нужно проверить условие "все расстояния <= N",
+    // можно спросить N и проверить:
+    char ask;
+    cout << "\nПроверить, что все расстояния ≤ N? (y/n): ";
+    cin >> ask;
+    if (ask == 'y' || ask == 'Y') {
+        int N;
+        cout << "Введите N: ";
+        cin >> N;
+        bool ok = true;
+        for (int i = 0; i < n; ++i) {
+            if (i == s) continue;
+            if (dist[i] == INF || dist[i] > N) { ok = false; break; }
+        }
+        if (ok) cout << "Все расстояния от " << startName << " до остальных ≤ " << N << "\n";
+        else cout << "Не все расстояния ≤ " << N << "\n";
+    }
 }
 
-void Graph::bellmanFord(const string& start) const {
+void Graph::bellmanFord(const string& start) {
     int n = vertexCount();
     int startIndex = findVertex(start);
 
@@ -689,10 +706,10 @@ void Graph::bellmanFord(const string& start) const {
                 }
             }
         }
-        if (!updated) break;
+        if (!updated) break; // оптимизация
     }
 
-    // Проверка на отрицательные циклы
+    // Проверка на отрицательные циклы (опционально)
     for (int u = 0; u < n; ++u) {
         if (dist[u] == INF) continue;
         for (const auto& e : adjList[u].adj) {
@@ -768,6 +785,70 @@ void Graph::floydPeriphery(const string& start, int N) const {
     }
 }
 
+int Graph::edmondsKarp(const string& sourceName, const string& sinkName) const {
+    int n = vertexCount();
+    int s = findVertex(sourceName);
+    int t = findVertex(sinkName);
+    if (s == -1 || t == -1) {
+        cout << "Ошибка: источник или сток не найдены.\n";
+        return 0;
+    }
+
+    // Матрица пропускных способностей
+    vector<vector<int>> capacity(n, vector<int>(n, 0));
+    for (int i = 0; i < n; ++i) {
+        for (const auto& e : adjList[i].adj) {
+            int j = findVertex(e.to);
+            if (j != -1)
+                capacity[i][j] += e.weight; // если несколько рёбер — суммируем
+        }
+    }
+
+    vector<vector<int>> flow(n, vector<int>(n, 0));
+    int maxFlow = 0;
+
+    while (true) {
+        // BFS для поиска пути с остаточной ёмкостью
+        vector<int> parent(n, -1);
+        queue<int> q;
+        q.push(s);
+        parent[s] = s;
+
+        while (!q.empty() && parent[t] == -1) {
+            int u = q.front();
+            q.pop();
+            for (int v = 0; v < n; ++v) {
+                if (parent[v] == -1 && capacity[u][v] - flow[u][v] > 0) {
+                    parent[v] = u;
+                    q.push(v);
+                }
+            }
+        }
+
+        // если пути нет — всё, закончили
+        if (parent[t] == -1)
+            break;
+
+        // находим минимальную пропускную способность по пути
+        int increment = INT_MAX;
+        for (int v = t; v != s; v = parent[v]) {
+            int u = parent[v];
+            increment = min(increment, capacity[u][v] - flow[u][v]);
+        }
+
+        // обновляем потоки вдоль пути
+        for (int v = t; v != s; v = parent[v]) {
+            int u = parent[v];
+            flow[u][v] += increment;
+            flow[v][u] -= increment; // обратное ребро
+        }
+
+        maxFlow += increment;
+    }
+
+    cout << "Максимальный поток из " << sourceName << " в " << sinkName << " = " << maxFlow << "\n";
+    return maxFlow;
+}
 
 struct GraphRecord {
     string name;
@@ -802,6 +883,7 @@ int main() {
         cout << "16. Найти вершины, из которых все минимальные пути до остальных ≤ N (Дейкстра)\n";
         cout << "17. Найти кратчайшие пути из заданной вершины (Беллман–Форд)\n";
         cout << "18. Определить N-периферию для заданной вершины (Флойд–Уоршелл)\n";
+        cout << "19. Найти максимальный поток (Эдмондс–Карп)\n";
         cout << "0. Выход\n";
         cout << "Введите ваш выбор: ";
         cin >> choice;
@@ -989,21 +1071,10 @@ int main() {
                 current->kruskalMST();
                 break;
             
-            case 16: {
+            case 16:
                 if (!current) { cout << "Нет активного графа.\n"; break; }
-                int N;
-                cout << "Введите N: ";
-                cin >> N;
-                auto res = current->verticesAllDistances(N);
-                if (res.empty()) {
-                    cout << "Нет таких вершин (никакая вершина не удовлетворяет условию).\n";
-                } else {
-                    cout << "Подходящие вершины: ";
-                    for (const auto &name : res) cout << name << " ";
-                    cout << "\n";
-                }
+                current->verticesAllDistances();
                 break;
-            }  
 
             case 17: {
                 if (!current) { cout << "Нет активного графа.\n"; break; }
@@ -1026,6 +1097,17 @@ int main() {
                 cout << "Введите N: ";
                 cin >> N;
                 current->floydPeriphery(start, N);
+                break;
+            }
+
+            case 19: {
+                if (!current) { cout << "Нет активного графа.\n"; break; }
+                string src, sink;
+                cout << "Введите имя источника: ";
+                cin >> src;
+                cout << "Введите имя стока: ";
+                cin >> sink;
+                current->edmondsKarp(src, sink);
                 break;
             }
 
