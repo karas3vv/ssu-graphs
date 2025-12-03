@@ -1,6 +1,6 @@
 #import "conf.typ": conf, intro, conclusion
 #show: conf.with(
-  title: [Тема работы],
+  title: [Отчет по теории графов],
   type: "referat",
   info: (
     author: (
