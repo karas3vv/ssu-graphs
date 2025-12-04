@@ -1,7 +1,7 @@
 #import "conf.typ": conf, intro, conclusion
 #show: conf.with(
   title: [Отчет по теории графов],
-  type: "referat",
+  type: "pract",
   info: (
     author: (
       name: [Карасева Вадима Дмитриевича],
